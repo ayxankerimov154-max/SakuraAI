@@ -40,8 +40,10 @@ fun VoiceSettingsOverlay(
     val malePitch by viewModel.malePitch.collectAsState()
     val speechRate by viewModel.speechRate.collectAsState()
     val isSpeaking by viewModel.isSpeaking.collectAsState()
+    val geminiApiKey by viewModel.geminiApiKey.collectAsState()
 
     var testLanguage by remember { mutableStateOf("AZ") }
+    var showApiKeyDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -96,14 +98,14 @@ fun VoiceSettingsOverlay(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Səs & Oyanma Parametrləri",
+                            text = "Friday Səs & AI Ayarları",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = FridayTextPrimary
                             )
                         )
                         Text(
-                            text = "Hey Friday & Kişi Səsi (TTS) İdarəetməsi",
+                            text = "Gemini Key, Səs Qalınlığı, Sürət & Oyanma",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = FridayTextSecondary
                             )
@@ -123,7 +125,99 @@ fun VoiceSettingsOverlay(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 0. Gemini API Key Card ---
+            Card(
+                colors = CardDefaults.cardColors(containerColor = FridayDarkSurfaceContainer),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, FridayCyan.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth().testTag("overlay_gemini_key_card")
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Key,
+                                contentDescription = null,
+                                tint = FridayCyan,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Gemini API Açar",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = FridayTextPrimary
+                                )
+                            )
+                        }
+
+                        val hasKey = geminiApiKey.isNotBlank()
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (hasKey) FridayGreen.copy(alpha = 0.2f) else FridayAmber.copy(alpha = 0.2f),
+                            border = BorderStroke(0.5.dp, if (hasKey) FridayGreen else FridayAmber)
+                        ) {
+                            Text(
+                                text = if (hasKey) "Yaddaşda var" else "Açarsız",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (hasKey) FridayGreen else FridayAmber,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                ),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val keyDisplay = if (geminiApiKey.isNotBlank()) {
+                        "${geminiApiKey.take(6)}••••••••${geminiApiKey.takeLast(4)}"
+                    } else {
+                        "API açarı daxil edilməyib (Offline rejim)"
+                    }
+                    Text(
+                        text = keyDisplay,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (geminiApiKey.isNotBlank()) FridayCyan else FridayTextSecondary,
+                            fontSize = 11.sp
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { showApiKeyDialog = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FridayCyan,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .testTag("overlay_change_api_key_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (geminiApiKey.isNotBlank()) "API Açarını Dəyiş" else "API Açarı Daxil Et",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // --- 1. 'Hey Friday' Wake-Word Toggle Section ---
             Card(
@@ -533,5 +627,17 @@ fun VoiceSettingsOverlay(
                 }
             }
         }
+    }
+
+    if (showApiKeyDialog) {
+        ApiKeyOnboardingDialog(
+            initialKey = geminiApiKey,
+            isDismissible = true,
+            onSaveKey = { key ->
+                viewModel.saveGeminiApiKey(key)
+                showApiKeyDialog = false
+            },
+            onDismiss = { showApiKeyDialog = false }
+        )
     }
 }

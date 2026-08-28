@@ -9,6 +9,9 @@
     <!-- Audio & Voice Interaction -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Hardware Controls & Settings -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -65,6 +68,11 @@
                 <action android:name="android.intent.action.PHONE_STATE" />
             </intent-filter>
         </receiver>
+
+        <service
+            android:name=".voice.FridayBackgroundVoiceService"
+            android:foregroundServiceType="microphone"
+            android:exported="false" />
 
     </application>
 

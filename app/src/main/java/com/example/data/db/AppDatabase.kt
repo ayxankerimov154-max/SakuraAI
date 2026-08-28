@@ -2,6 +2,7 @@ package com.example.data.db
 
 import androidx.room.*
 import com.example.data.model.AssistantLogEntity
+import com.example.data.model.ChatMessageEntity
 import com.example.data.model.FileDocumentEntity
 import com.example.data.model.VoiceNoteEntity
 import kotlinx.coroutines.flow.Flow
@@ -66,15 +67,39 @@ interface AssistantLogDao {
     suspend fun clearLogs()
 }
 
+@Dao
+interface ChatMessageDao {
+    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
+    fun getAllMessages(): Flow<List<ChatMessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM chat_messages")
+    fun getMessageCount(): Flow<Int>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: ChatMessageEntity): Long
+
+    @Query("DELETE FROM chat_messages WHERE id = :id")
+    suspend fun deleteMessage(id: Long)
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clearAllMessages()
+}
+
 @Database(
-    entities = [VoiceNoteEntity::class, FileDocumentEntity::class, AssistantLogEntity::class],
-    version = 1,
+    entities = [
+        VoiceNoteEntity::class,
+        FileDocumentEntity::class,
+        AssistantLogEntity::class,
+        ChatMessageEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun voiceNoteDao(): VoiceNoteDao
     abstract fun fileDocumentDao(): FileDocumentDao
     abstract fun assistantLogDao(): AssistantLogDao
+    abstract fun chatMessageDao(): ChatMessageDao
 
     companion object {
         @Volatile
@@ -86,7 +111,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "friday_ai_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

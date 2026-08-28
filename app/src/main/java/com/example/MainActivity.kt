@@ -35,9 +35,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.FridayViewModel
+import com.example.ui.components.ApiKeyOnboardingDialog
 import com.example.ui.components.VoiceSettingsOverlay
 import com.example.ui.screens.AssistantScreen
 import com.example.ui.screens.FileEditorDialog
+import com.example.ui.screens.FridaySettingsScreen
 import com.example.ui.screens.NotesFilesScreen
 import com.example.ui.screens.TelephonyScreen
 import com.example.ui.screens.WidgetsScreen
@@ -64,6 +66,15 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
     val editingFile by viewModel.editingFile.collectAsState()
     val isAwakeModalOpen by viewModel.isHotwordAwakeModalOpen.collectAsState()
     val isVoiceSettingsOverlayOpen by viewModel.isVoiceSettingsOverlayOpen.collectAsState()
+    val isFirstLaunch by viewModel.isFirstLaunch.collectAsState()
+    val geminiApiKey by viewModel.geminiApiKey.collectAsState()
+    var showFirstLaunchDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isFirstLaunch, geminiApiKey) {
+        if (isFirstLaunch && geminiApiKey.isBlank()) {
+            showFirstLaunchDialog = true
+        }
+    }
 
     // Permission Launcher
     val permissionsToRequest = remember {
@@ -210,7 +221,7 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                             contentDescription = "Widget-lər"
                         )
                     },
-                    label = { Text("Ayarlar", fontSize = 11.sp) },
+                    label = { Text("Sistem", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
                         selectedTextColor = FridayCyan,
@@ -262,6 +273,27 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                     ),
                     modifier = Modifier.testTag("nav_tab_comms")
                 )
+
+                // Tab 4: Friday Ayarları (Dedicated Settings)
+                NavigationBarItem(
+                    selected = selectedTab == 4,
+                    onClick = { viewModel.setSelectedTab(4) },
+                    icon = {
+                        Icon(
+                            imageVector = if (selectedTab == 4) Icons.Default.SettingsSuggest else Icons.Default.Tune,
+                            contentDescription = "Friday Ayarları"
+                        )
+                    },
+                    label = { Text("Ayarlar", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = FridayCyan,
+                        indicatorColor = FridayCyan,
+                        unselectedIconColor = FridayTextSecondary,
+                        unselectedTextColor = FridayTextSecondary
+                    ),
+                    modifier = Modifier.testTag("nav_tab_settings")
+                )
             }
         }
     ) { innerPadding ->
@@ -276,6 +308,24 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                 1 -> WidgetsScreen(viewModel = viewModel)
                 2 -> NotesFilesScreen(viewModel = viewModel)
                 3 -> TelephonyScreen(viewModel = viewModel)
+                4 -> FridaySettingsScreen(viewModel = viewModel)
+            }
+
+            // First Launch Gemini API Key Setup Dialog
+            if (showFirstLaunchDialog) {
+                ApiKeyOnboardingDialog(
+                    initialKey = geminiApiKey,
+                    isDismissible = true,
+                    onSaveKey = { key ->
+                        viewModel.saveGeminiApiKey(key)
+                        viewModel.dismissFirstLaunchModal()
+                        showFirstLaunchDialog = false
+                    },
+                    onDismiss = {
+                        viewModel.dismissFirstLaunchModal()
+                        showFirstLaunchDialog = false
+                    }
+                )
             }
 
             // Voice & 'Hey Friday' Settings Overlay Menu

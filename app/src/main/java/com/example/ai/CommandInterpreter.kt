@@ -25,12 +25,14 @@ class CommandInterpreter(
     private val voiceNoteRepository: VoiceNoteRepository,
     private val assistantLogRepository: AssistantLogRepository,
     private val ttsEngine: TextToSpeechEngine,
-    private val geminiService: GeminiService
+    private val geminiService: GeminiService,
+    private val apiKeyProvider: () -> String = { "" }
 ) {
 
-    suspend fun processCommand(rawInput: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun processCommand(rawInput: String, customApiKey: String? = null): ActionResult = withContext(Dispatchers.IO) {
         val input = rawInput.trim()
         val lower = input.lowercase()
+        val effectiveApiKey = customApiKey?.ifBlank { null } ?: apiKeyProvider()
 
         val result: ActionResult = when {
             // --- Wi-Fi Commands ---
@@ -99,7 +101,7 @@ class CommandInterpreter(
 
             // --- Default to Intelligent Gemini AI ---
             else -> {
-                val response = geminiService.askGemini(input)
+                val response = geminiService.askGemini(input, effectiveApiKey)
                 ActionResult.GeneralAnswer(response)
             }
         }

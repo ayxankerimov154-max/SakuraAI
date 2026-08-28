@@ -39,3 +39,13 @@ data class AssistantLogEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val isSuccess: Boolean = true
 )
+
+@Entity(tableName = "chat_messages")
+data class ChatMessageEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val sender: String, // "USER" or "FRIDAY"
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val actionType: String? = null
+)

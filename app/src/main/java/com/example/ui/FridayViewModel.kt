@@ -11,13 +11,16 @@ import com.example.data.model.AssistantLogEntity
 import com.example.data.model.FileDocumentEntity
 import com.example.data.model.VoiceNoteEntity
 import com.example.data.repository.AssistantLogRepository
+import com.example.data.repository.ChatRepository
 import com.example.data.repository.FileManagerRepository
+import com.example.data.repository.FridayPreferencesRepository
 import com.example.data.repository.VoiceNoteRepository
 import com.example.system.SystemSettingsManager
 import com.example.system.SystemState
 import com.example.telephony.CommsEvent
 import com.example.telephony.TelephonyService
 import com.example.voice.AudioRecorderPlayer
+import com.example.voice.FridayBackgroundVoiceService
 import com.example.voice.PlaybackState
 import com.example.voice.SpeechState
 import com.example.voice.TextToSpeechEngine
@@ -39,6 +42,8 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     private val context = application.applicationContext
     private val database = AppDatabase.getDatabase(context)
 
+    val preferencesRepository = FridayPreferencesRepository(context)
+    val chatRepository = ChatRepository(database.chatMessageDao())
     val voiceNoteRepository = VoiceNoteRepository(database.voiceNoteDao(), context)
     val fileManagerRepository = FileManagerRepository(database.fileDocumentDao(), context)
     val assistantLogRepository = AssistantLogRepository(database.assistantLogDao())
@@ -46,7 +51,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     val telephonyService = TelephonyService(context)
     val ttsEngine = TextToSpeechEngine(context)
     val audioRecorderPlayer = AudioRecorderPlayer(context)
-    private val geminiService = GeminiService()
+    val geminiService = GeminiService()
 
     val commandInterpreter = CommandInterpreter(
         systemSettingsManager = systemSettingsManager,
@@ -55,7 +60,8 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         voiceNoteRepository = voiceNoteRepository,
         assistantLogRepository = assistantLogRepository,
         ttsEngine = ttsEngine,
-        geminiService = geminiService
+        geminiService = geminiService,
+        apiKeyProvider = { preferencesRepository.getEffectiveApiKey() }
     )
 
     private val _speechManager: VoiceSpeechManager = VoiceSpeechManager(
@@ -68,7 +74,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         }
     )
 
-    // UI States
+    // UI States from Repositories
     val systemState: StateFlow<SystemState> = systemSettingsManager.systemState
     val allVoiceNotes: StateFlow<List<VoiceNoteEntity>> = voiceNoteRepository.allNotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -77,12 +83,19 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     val recentLogs: StateFlow<List<AssistantLogEntity>> = assistantLogRepository.recentLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Settings States
+    val geminiApiKey: StateFlow<String> = preferencesRepository.geminiApiKey
+    val isFirstLaunch: StateFlow<Boolean> = preferencesRepository.isFirstLaunch
+    val assistantLanguage: StateFlow<String> = preferencesRepository.language
+    val isBackgroundListeningEnabled: StateFlow<Boolean> = preferencesRepository.isBackgroundListeningEnabled
+    val isSaveHistoryEnabled: StateFlow<Boolean> = preferencesRepository.isSaveHistoryEnabled
+
     val speechState: StateFlow<SpeechState> = _speechManager.speechState
     val rmsLevel: StateFlow<Float> = _speechManager.rmsLevel
-    val isHotwordEnabled: StateFlow<Boolean> = _speechManager.isHotwordEnabled
+    val isHotwordEnabled: StateFlow<Boolean> = preferencesRepository.isHotwordEnabled
     val isSpeaking: StateFlow<Boolean> = ttsEngine.isSpeaking
-    val malePitch: StateFlow<Float> = ttsEngine.malePitch
-    val speechRate: StateFlow<Float> = ttsEngine.speechRate
+    val malePitch: StateFlow<Float> = preferencesRepository.voicePitch
+    val speechRate: StateFlow<Float> = preferencesRepository.speechRate
 
     private val _isVoiceSettingsOverlayOpen = MutableStateFlow(false)
     val isVoiceSettingsOverlayOpen: StateFlow<Boolean> = _isVoiceSettingsOverlayOpen.asStateFlow()
@@ -93,15 +106,15 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
 
     val incomingCallAlert: StateFlow<CommsEvent.IncomingCall?> = telephonyService.currentIncomingCall
 
-    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(
-        listOf(
-            ChatMessage(
-                sender = "FRIDAY",
-                text = "Salam! Mən Friday (Fida) — çoxdilli şəxsi AI köməkçinizəm. Dünyanın istənilən dilində mənimlə danışa bilərsiniz. Telefon fəaliyyətlərini, səsli qeydləri, faylları və zəngləri idarə etmək üçün \"Hey Friday\" və ya \"Hey Fida\" deyə bilərsiniz."
-            )
-        )
+    private val defaultGreeting = ChatMessage(
+        sender = "FRIDAY",
+        text = "Salam! Mən Friday (Fida) — çoxdilli şəxsi AI köməkçinizəm. Dünyanın istənilən dilində mənimlə danışa bilərsiniz. Telefon fəaliyyətlərini, səsli qeydləri, faylları və zəngləri idarə etmək üçün \"Hey Friday\" və ya \"Hey Fida\" deyə bilərsiniz."
     )
+
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(listOf(defaultGreeting))
     val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
+    val chatMessageCount: StateFlow<Int> = chatRepository.messageCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
@@ -113,6 +126,35 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     val editingFile: StateFlow<FileDocumentEntity?> = _editingFile.asStateFlow()
 
     init {
+        // Apply persisted voice settings to TTS engine
+        ttsEngine.setMaleVoicePitch(preferencesRepository.voicePitch.value)
+        ttsEngine.setSpeechRate(preferencesRepository.speechRate.value)
+        _speechManager.setHotwordEnabled(preferencesRepository.isHotwordEnabled.value)
+
+        // Load conversation history from Room
+        viewModelScope.launch {
+            chatRepository.allMessages.collect { entities ->
+                if (entities.isNotEmpty()) {
+                    _chatMessages.value = entities.map {
+                        ChatMessage(
+                            id = it.id,
+                            sender = it.sender,
+                            text = it.text,
+                            timestamp = it.timestamp,
+                            actionType = it.actionType
+                        )
+                    }
+                } else {
+                    _chatMessages.value = listOf(defaultGreeting)
+                }
+            }
+        }
+
+        // Sync background service with persisted preference
+        if (preferencesRepository.isBackgroundListeningEnabled.value) {
+            FridayBackgroundVoiceService.startService(context)
+        }
+
         // Observe telephony events for real-time voice announcements
         viewModelScope.launch {
             telephonyService.events.collect { event ->
@@ -121,17 +163,13 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
                         val caller = event.callerName ?: event.callerNumber
                         val announcement = "Diqqət! Gələn zəng: $caller. Qəbul etmək üçün 'Zəngi qəbul et', rədd etmək üçün 'Zəngi rədd et' deyin."
                         ttsEngine.speak(announcement)
-                        _chatMessages.update {
-                            it + ChatMessage(sender = "FRIDAY", text = announcement, actionType = "INCOMING_CALL")
-                        }
+                        appendMessage("FRIDAY", announcement, "INCOMING_CALL")
                     }
                     is CommsEvent.IncomingSms -> {
                         val sender = event.senderName ?: event.senderNumber
                         val announcement = "Yeni SMS gəldi. Göndərən: $sender. Mesaj: ${event.messageBody}"
                         ttsEngine.speak(announcement)
-                        _chatMessages.update {
-                            it + ChatMessage(sender = "FRIDAY", text = announcement, actionType = "INCOMING_SMS")
-                        }
+                        appendMessage("FRIDAY", announcement, "INCOMING_SMS")
                     }
                     else -> {}
                 }
@@ -144,7 +182,71 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleHotword(enabled: Boolean) {
+        preferencesRepository.setHotwordEnabled(enabled)
         _speechManager.setHotwordEnabled(enabled)
+    }
+
+    fun toggleBackgroundListening(enabled: Boolean) {
+        preferencesRepository.setBackgroundListeningEnabled(enabled)
+        if (enabled) {
+            FridayBackgroundVoiceService.startService(context)
+            ttsEngine.speak("Arxa planda dinləmə aktivləşdirildi.")
+        } else {
+            FridayBackgroundVoiceService.stopService(context)
+            ttsEngine.speak("Arxa planda dinləmə dayandırıldı.")
+        }
+    }
+
+    fun toggleSaveHistory(enabled: Boolean) {
+        preferencesRepository.setSaveHistoryEnabled(enabled)
+    }
+
+    fun saveGeminiApiKey(key: String) {
+        preferencesRepository.setGeminiApiKey(key)
+        ttsEngine.speak("Gemini API açarı uğurla yadda saxlanıldı.")
+    }
+
+    suspend fun testGeminiConnection(key: String): Result<String> {
+        return geminiService.testApiKey(key)
+    }
+
+    fun setAssistantLanguage(lang: String) {
+        preferencesRepository.setLanguage(lang)
+        val confirmation = when (lang) {
+            "EN" -> "Language set to English."
+            "RU" -> "Язык ассистента установлен на русский."
+            "TR" -> "Asistan dili Türkçe olarak ayarlandı."
+            else -> "Köməkçi dili Azərbaycan dili olaraq təyin edildi."
+        }
+        ttsEngine.speak(confirmation)
+    }
+
+    fun clearChatHistory() {
+        viewModelScope.launch {
+            chatRepository.clearHistory()
+            _chatMessages.value = listOf(defaultGreeting)
+            ttsEngine.speak("Söhbət tarixçəsi təmizləndi.")
+        }
+    }
+
+    fun dismissFirstLaunchModal() {
+        preferencesRepository.setFirstLaunchCompleted()
+    }
+
+    private fun appendMessage(sender: String, text: String, actionType: String? = null) {
+        val newMsg = ChatMessage(
+            sender = sender,
+            text = text,
+            timestamp = System.currentTimeMillis(),
+            actionType = actionType
+        )
+        if (preferencesRepository.isSaveHistoryEnabled.value) {
+            viewModelScope.launch {
+                chatRepository.saveMessage(sender, text, actionType)
+            }
+        } else {
+            _chatMessages.update { it + newMsg }
+        }
     }
 
     fun startListening() {
@@ -158,7 +260,13 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun handleHotwordAwakening() {
         _isHotwordAwakeModalOpen.value = true
-        ttsEngine.speak("Bəli, sizi dinləyirəm?")
+        val response = when (preferencesRepository.language.value) {
+            "EN" -> "Yes, sir, I am listening."
+            "RU" -> "Да, сэр, слушаю вас."
+            "TR" -> "Evet, sizi dinliyorum."
+            else -> "Bəli, sizi dinləyirəm?"
+        }
+        ttsEngine.speak(response)
         startListening()
     }
 
@@ -170,12 +278,10 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         _isHotwordAwakeModalOpen.value = false
         if (rawText.isBlank()) return
 
-        _chatMessages.update {
-            it + ChatMessage(sender = "USER", text = rawText)
-        }
+        appendMessage("USER", rawText)
 
         viewModelScope.launch {
-            val result = commandInterpreter.processCommand(rawText)
+            val result = commandInterpreter.processCommand(rawText, preferencesRepository.getEffectiveApiKey())
             val responseText = when (result) {
                 is ActionResult.Success -> result.message
                 is ActionResult.VoiceNoteAction -> {
@@ -189,19 +295,15 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
                 is ActionResult.GeneralAnswer -> result.answer
             }
 
-            _chatMessages.update {
-                it + ChatMessage(
-                    sender = "FRIDAY",
-                    text = responseText,
-                    actionType = when (result) {
-                        is ActionResult.Success -> result.actionType
-                        is ActionResult.VoiceNoteAction -> "VOICE_NOTE"
-                        is ActionResult.CallAction -> "CALL"
-                        is ActionResult.SmsAction -> "SMS"
-                        is ActionResult.GeneralAnswer -> "AI"
-                    }
-                )
+            val actionType = when (result) {
+                is ActionResult.Success -> result.actionType
+                is ActionResult.VoiceNoteAction -> "VOICE_NOTE"
+                is ActionResult.CallAction -> "CALL"
+                is ActionResult.SmsAction -> "SMS"
+                is ActionResult.GeneralAnswer -> "AI"
             }
+
+            appendMessage("FRIDAY", responseText, actionType)
             systemSettingsManager.refreshState()
         }
     }
@@ -372,14 +474,17 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setMaleVoicePitch(pitch: Float) {
+        preferencesRepository.setVoicePitch(pitch)
         ttsEngine.setMaleVoicePitch(pitch)
     }
 
     fun setSpeechRate(rate: Float) {
+        preferencesRepository.setSpeechRate(rate)
         ttsEngine.setSpeechRate(rate)
     }
 
     fun resetVoiceDefaults() {
+        preferencesRepository.resetVoiceDefaults()
         ttsEngine.resetVoiceDefaults()
     }
 

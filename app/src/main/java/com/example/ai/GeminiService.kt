@@ -105,6 +105,48 @@ class GeminiService {
         }
     }
 
+    suspend fun testApiKey(apiKey: String): Result<String> = withContext(Dispatchers.IO) {
+        val trimmed = apiKey.trim()
+        if (trimmed.isBlank()) {
+            return@withContext Result.failure(Exception("API Key boş ola bilməz."))
+        }
+        try {
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$trimmed"
+            val jsonBody = JSONObject().apply {
+                put("contents", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("parts", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("text", "Test connection. Reply with 'OK'.")
+                            })
+                        })
+                    })
+                })
+            }
+
+            val request = Request.Builder()
+                .url(url)
+                .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (response.isSuccessful) {
+                Result.success("Əlaqə uğurludur! Gemini 3.5 Flash aktivdir.")
+            } else {
+                val errorMsg = try {
+                    JSONObject(responseBody).optJSONObject("error")?.optString("message") ?: "Xəta kodu: ${response.code}"
+                } catch (_: Exception) {
+                    "Xəta kodu: ${response.code}"
+                }
+                Result.failure(Exception("API Xətası: $errorMsg"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Şəbəkə xətası: ${e.localizedMessage ?: e.message}"))
+        }
+    }
+
     private fun getOfflineSmartResponse(prompt: String): String {
         val lower = prompt.lowercase().trim()
         val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
