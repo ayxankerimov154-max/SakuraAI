@@ -81,6 +81,11 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
     val rmsLevel: StateFlow<Float> = _speechManager.rmsLevel
     val isHotwordEnabled: StateFlow<Boolean> = _speechManager.isHotwordEnabled
     val isSpeaking: StateFlow<Boolean> = ttsEngine.isSpeaking
+    val malePitch: StateFlow<Float> = ttsEngine.malePitch
+    val speechRate: StateFlow<Float> = ttsEngine.speechRate
+
+    private val _isVoiceSettingsOverlayOpen = MutableStateFlow(false)
+    val isVoiceSettingsOverlayOpen: StateFlow<Boolean> = _isVoiceSettingsOverlayOpen.asStateFlow()
 
     val isRecordingAudio: StateFlow<Boolean> = audioRecorderPlayer.isRecording
     val recordingDurationMs: StateFlow<Long> = audioRecorderPlayer.recordingDurationMs
@@ -92,7 +97,7 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         listOf(
             ChatMessage(
                 sender = "FRIDAY",
-                text = "Salam! Mən Friday AI köməkçinizəm. Telefon fəaliyyətlərini, səsli qeydləri, faylları və zəngləri idarə etmək üçün hazıram. \"Hey Friday\" deyə və ya mikrofona toxuna bilərsiniz."
+                text = "Salam! Mən Friday (Fida) — çoxdilli şəxsi AI köməkçinizəm. Dünyanın istənilən dilində mənimlə danışa bilərsiniz. Telefon fəaliyyətlərini, səsli qeydləri, faylları və zəngləri idarə etmək üçün \"Hey Friday\" və ya \"Hey Fida\" deyə bilərsiniz."
             )
         )
     )
@@ -356,6 +361,31 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
 
     fun stopSpeaking() {
         ttsEngine.stop()
+    }
+
+    fun openVoiceSettingsOverlay() {
+        _isVoiceSettingsOverlayOpen.value = true
+    }
+
+    fun closeVoiceSettingsOverlay() {
+        _isVoiceSettingsOverlayOpen.value = false
+    }
+
+    fun setMaleVoicePitch(pitch: Float) {
+        ttsEngine.setMaleVoicePitch(pitch)
+    }
+
+    fun setSpeechRate(rate: Float) {
+        ttsEngine.setSpeechRate(rate)
+    }
+
+    fun resetVoiceDefaults() {
+        ttsEngine.resetVoiceDefaults()
+    }
+
+    fun testVoiceSettings(sampleText: String = "Salam! Səs və sürət parametrləri uğurla tətbiq edildi. Friday xidmətinizdədir.") {
+        ttsEngine.stop()
+        ttsEngine.speak(sampleText)
     }
 
     override fun onCleared() {

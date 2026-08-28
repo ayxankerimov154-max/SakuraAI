@@ -44,8 +44,10 @@ class VoiceSpeechManager(
     private var isContinuousListening = false
 
     private val hotwords = listOf(
-        "hey friday", "friday", "ey friday", "hey fraydey",
-        "fraidey", "fraidei", "salam friday", "cümə", "hey cume"
+        "hey fida", "fida", "ay fida", "ey fida", "hey fiday", "fiday",
+        "hey friday", "friday", "ey friday", "hey fraydey", "fraydey",
+        "fraidey", "fraidei", "salam friday", "salam fida", "cümə", "hey cume",
+        "hello friday", "привет фрайдей", "хей фрайдей"
     )
 
     init {

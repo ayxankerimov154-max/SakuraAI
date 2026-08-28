@@ -34,63 +34,63 @@ class CommandInterpreter(
 
         val result: ActionResult = when {
             // --- Wi-Fi Commands ---
-            lower.contains("wifi") || lower.contains("wi-fi") || lower.contains("vayfay") -> {
+            lower.contains("wifi") || lower.contains("wi-fi") || lower.contains("vayfay") || lower.contains("вайфай") || lower.contains("вай-фай") -> {
                 handleWifiCommand(lower)
             }
 
             // --- Bluetooth Commands ---
-            lower.contains("bluetooth") || lower.contains("blutuz") || lower.contains("blutus") -> {
+            lower.contains("bluetooth") || lower.contains("blutuz") || lower.contains("blutus") || lower.contains("блютуз") -> {
                 handleBluetoothCommand(lower)
             }
 
             // --- Flashlight / Torch Commands ---
-            lower.contains("fənər") || lower.contains("fener") || lower.contains("işıq") || lower.contains("isiq") || lower.contains("flash") -> {
+            lower.contains("fənər") || lower.contains("fener") || lower.contains("işıq") || lower.contains("isiq") || lower.contains("flash") || lower.contains("torch") || lower.contains("фонарик") || lower.contains("фонарь") -> {
                 handleFlashlightCommand(lower)
             }
 
             // --- Volume / Səs Səviyyəsi Commands ---
-            lower.contains("səs") || lower.contains("ses") || lower.contains("volume") -> {
+            lower.contains("səs") || lower.contains("ses") || lower.contains("volume") || lower.contains("громкость") || lower.contains("mute") || lower.contains("тихий") -> {
                 handleVolumeCommand(lower)
             }
 
             // --- Brightness / Parlaqlıq Commands ---
-            lower.contains("parlaqlıq") || lower.contains("parlaqliq") || lower.contains("işıqlılıq") || lower.contains("ekran") && (lower.contains("artır") || lower.contains("azalt")) -> {
+            lower.contains("parlaqlıq") || lower.contains("parlaqliq") || lower.contains("işıqlılıq") || lower.contains("brightness") || lower.contains("яркость") || (lower.contains("ekran") || lower.contains("screen") || lower.contains("экран")) && (lower.contains("artır") || lower.contains("azalt") || lower.contains("up") || lower.contains("down") || lower.contains("ярче")) -> {
                 handleBrightnessCommand(lower)
             }
 
             // --- Voice Notes Commands ---
-            lower.contains("səsli qeyd") || lower.contains("sesli qeyd") || lower.contains("audio qeyd") || lower.contains("diktofon") -> {
+            lower.contains("səsli qeyd") || lower.contains("sesli qeyd") || lower.contains("audio qeyd") || lower.contains("diktofon") || lower.contains("voice note") || lower.contains("диктофон") || lower.contains("голосовая запись") -> {
                 handleVoiceNoteCommand(lower)
             }
 
             // --- File Management Commands ---
-            lower.startsWith("fayl") || lower.contains("fayl yarat") || lower.contains("fayl sil") || lower.contains("sənəd yarat") || lower.contains("faylı sil") -> {
+            lower.startsWith("fayl") || lower.startsWith("file") || lower.startsWith("файл") || lower.contains("fayl yarat") || lower.contains("fayl sil") || lower.contains("create file") || lower.contains("delete file") || lower.contains("создай файл") || lower.contains("удали файл") -> {
                 handleFileCommand(input, lower)
             }
 
             // --- Telephony: Call Commands ---
-            lower.contains("zəng et") || lower.contains("zeng et") || lower.contains("zəng elə") || lower.contains("yığ") || lower.contains("yig") || lower.startsWith("call ") -> {
+            lower.contains("zəng et") || lower.contains("zeng et") || lower.contains("zəng elə") || lower.contains("yığ") || lower.contains("yig") || lower.startsWith("call ") || lower.contains("позвони") || lower.contains("набери") || lower.contains("ara") -> {
                 handleCallCommand(input, lower)
             }
 
             // --- Telephony: Answer / Reject Call Commands ---
-            lower.contains("zəngi qəbul et") || lower.contains("zengi qebul et") || lower.contains("cavab ver") || lower.contains("zəngə cavab ver") -> {
+            lower.contains("zəngi qəbul et") || lower.contains("zengi qebul et") || lower.contains("cavab ver") || lower.contains("answer call") || lower.contains("ответь на звонок") || lower.contains("прими вызов") -> {
                 telephonyService.answerCall()
                 ActionResult.Success("Zəng qəbul edildi.", "CALL_ANSWER")
             }
 
-            lower.contains("zəngi rədd et") || lower.contains("zengi redd et") || lower.contains("zəngi bağla") || lower.contains("zəngi sonlandır") -> {
+            lower.contains("zəngi rədd et") || lower.contains("zengi redd et") || lower.contains("zəngi bağla") || lower.contains("reject call") || lower.contains("отклони звонок") || lower.contains("сбрось вызов") -> {
                 telephonyService.rejectCall()
                 ActionResult.Success("Zəng rədd edildi.", "CALL_REJECT")
             }
 
             // --- Telephony: SMS Commands ---
-            lower.contains("sms") || lower.contains("mesaj yaz") || lower.contains("mesaj göndər") || lower.contains("mesaj gonder") -> {
+            lower.contains("sms") || lower.contains("mesaj yaz") || lower.contains("mesaj göndər") || lower.contains("mesaj gonder") || lower.contains("send sms") || lower.contains("send message") || lower.contains("смс") || lower.contains("отправь сообщение") -> {
                 handleSmsCommand(input, lower)
             }
 
             // --- Device Battery Status ---
-            lower.contains("batareya") || lower.contains("zaryadka") || lower.contains("enerji") -> {
+            lower.contains("batareya") || lower.contains("zaryadka") || lower.contains("enerji") || lower.contains("battery") || lower.contains("батарея") || lower.contains("заряд") || lower.contains("pil") -> {
                 val state = systemSettingsManager.fetchCurrentState()
                 val chargingText = if (state.isCharging) "enerji yığır" else "enerji yığmır"
                 val msg = "Batareya səviyyəsi: %${state.batteryPercent}, telefon hazırda $chargingText."
@@ -134,11 +134,26 @@ class CommandInterpreter(
         result
     }
 
+    private fun isTurnOnIntent(lower: String): Boolean {
+        return lower.contains("aç") || lower.contains("yandır") || lower.contains("qoş") ||
+                lower.contains("işə sal") || lower.contains("on") || lower.contains("enable") ||
+                lower.contains("turn on") || lower.contains("switch on") ||
+                lower.contains("включи") || lower.contains("зажги") || lower.contains("вруби") ||
+                lower.contains("yak")
+    }
+
+    private fun isTurnOffIntent(lower: String): Boolean {
+        return lower.contains("söndür") || lower.contains("bağla") || lower.contains("kəs") ||
+                lower.contains("off") || lower.contains("disable") || lower.contains("turn off") ||
+                lower.contains("switch off") || lower.contains("выключи") || lower.contains("погаси") ||
+                lower.contains("kapat")
+    }
+
     private fun handleWifiCommand(lower: String): ActionResult {
-        return if (lower.contains("aç") || lower.contains("yandır") || lower.contains("qoş")) {
+        return if (isTurnOnIntent(lower)) {
             systemSettingsManager.toggleWifi(true)
             ActionResult.Success("Wi-Fi aktivləşdirildi.", "WIFI_ON")
-        } else if (lower.contains("söndür") || lower.contains("bağla") || lower.contains("kəs")) {
+        } else if (isTurnOffIntent(lower)) {
             systemSettingsManager.toggleWifi(false)
             ActionResult.Success("Wi-Fi söndürüldü.", "WIFI_OFF")
         } else {
@@ -148,10 +163,10 @@ class CommandInterpreter(
     }
 
     private fun handleBluetoothCommand(lower: String): ActionResult {
-        return if (lower.contains("aç") || lower.contains("yandır") || lower.contains("qoş")) {
+        return if (isTurnOnIntent(lower)) {
             systemSettingsManager.toggleBluetooth(true)
             ActionResult.Success("Bluetooth aktivləşdirildi.", "BT_ON")
-        } else if (lower.contains("söndür") || lower.contains("bağla") || lower.contains("kəs")) {
+        } else if (isTurnOffIntent(lower)) {
             systemSettingsManager.toggleBluetooth(false)
             ActionResult.Success("Bluetooth söndürüldü.", "BT_OFF")
         } else {
@@ -161,14 +176,12 @@ class CommandInterpreter(
     }
 
     private fun handleFlashlightCommand(lower: String): ActionResult {
-        return if (lower.contains("aç") || lower.contains("yandır") || lower.contains("işə sal")) {
-            val ok = systemSettingsManager.toggleFlashlight(true)
-            if (ok) ActionResult.Success("Fənər yandırıldı.", "TORCH_ON")
-            else ActionResult.Success("Fənər açıldı.", "TORCH_ON")
+        return if (isTurnOnIntent(lower)) {
+            systemSettingsManager.toggleFlashlight(true)
+            ActionResult.Success("Fənər yandırıldı.", "TORCH_ON")
         } else {
-            val ok = systemSettingsManager.toggleFlashlight(false)
-            if (ok) ActionResult.Success("Fənər söndürüldü.", "TORCH_OFF")
-            else ActionResult.Success("Fənər söndürüldü.", "TORCH_OFF")
+            systemSettingsManager.toggleFlashlight(false)
+            ActionResult.Success("Fənər söndürüldü.", "TORCH_OFF")
         }
     }
 
@@ -176,22 +189,33 @@ class CommandInterpreter(
         val percentRegex = Regex("(\\d+)\\s*%")
         val match = percentRegex.find(lower)
 
+        val isIncrease = lower.contains("artır") || lower.contains("yuxarı") || lower.contains("çoxalt") ||
+                lower.contains("increase") || lower.contains("up") || lower.contains("raise") ||
+                lower.contains("увеличь") || lower.contains("громче") || lower.contains("yükselt")
+
+        val isDecrease = lower.contains("azalt") || lower.contains("aşağı") || lower.contains("yavaşlat") ||
+                lower.contains("decrease") || lower.contains("down") || lower.contains("lower") ||
+                lower.contains("уменьши") || lower.contains("тише") || lower.contains("kıs")
+
+        val isMute = lower.contains("bağla") || lower.contains("səssiz") || lower.contains("sessiz") ||
+                lower.contains("mute") || lower.contains("silent") || lower.contains("без звука") || lower.contains("0")
+
         return if (match != null) {
             val percent = match.groupValues[1].toIntOrNull() ?: 50
             systemSettingsManager.setMediaVolume(percent)
             systemSettingsManager.setRingVolume(percent)
             ActionResult.Success("Səs səviyyəsi %$percent olaraq təyin edildi.", "VOLUME_SET")
-        } else if (lower.contains("artır") || lower.contains("yuxarı") || lower.contains("çoxalt")) {
+        } else if (isIncrease) {
             val current = systemSettingsManager.systemState.value.mediaVolumePercent
             val next = (current + 20).coerceAtMost(100)
             systemSettingsManager.setMediaVolume(next)
             ActionResult.Success("Səs %$next səviyyəsinə artırıldı.", "VOLUME_UP")
-        } else if (lower.contains("azalt") || lower.contains("aşağı") || lower.contains("yavaşlat")) {
+        } else if (isDecrease) {
             val current = systemSettingsManager.systemState.value.mediaVolumePercent
             val next = (current - 20).coerceAtLeast(0)
             systemSettingsManager.setMediaVolume(next)
             ActionResult.Success("Səs %$next səviyyəsinə endirildi.", "VOLUME_DOWN")
-        } else if (lower.contains("bağla") || lower.contains("səssiz") || lower.contains("sessiz") || lower.contains("0")) {
+        } else if (isMute) {
             systemSettingsManager.setMediaVolume(0)
             systemSettingsManager.setRingerMode(AudioManager.RINGER_MODE_SILENT)
             ActionResult.Success("Səs tamamilə bağlandı və səssiz rejimə keçirildi.", "VOLUME_MUTE")
@@ -205,16 +229,24 @@ class CommandInterpreter(
         val percentRegex = Regex("(\\d+)\\s*%")
         val match = percentRegex.find(lower)
 
+        val isIncrease = lower.contains("artır") || lower.contains("çoxalt") || lower.contains("maksimum") ||
+                lower.contains("increase") || lower.contains("up") || lower.contains("brighter") ||
+                lower.contains("увеличь") || lower.contains("ярче") || lower.contains("yükselt")
+
+        val isDecrease = lower.contains("azalt") || lower.contains("endir") || lower.contains("minimum") ||
+                lower.contains("decrease") || lower.contains("down") || lower.contains("dim") ||
+                lower.contains("уменьши") || lower.contains("темнее") || lower.contains("kıs")
+
         return if (match != null) {
             val percent = match.groupValues[1].toIntOrNull() ?: 60
             systemSettingsManager.setBrightness(percent)
             ActionResult.Success("Ekran parlaqlığı %$percent olaraq təyin edildi.", "BRIGHTNESS_SET")
-        } else if (lower.contains("artır") || lower.contains("çoxalt") || lower.contains("maksimum")) {
+        } else if (isIncrease) {
             val current = systemSettingsManager.systemState.value.brightnessPercent
             val next = (current + 25).coerceAtMost(100)
             systemSettingsManager.setBrightness(next)
             ActionResult.Success("Parlaqlıq %$next səviyyəsinə artırıldı.", "BRIGHTNESS_UP")
-        } else if (lower.contains("azalt") || lower.contains("endir") || lower.contains("minimum")) {
+        } else if (isDecrease) {
             val current = systemSettingsManager.systemState.value.brightnessPercent
             val next = (current - 25).coerceAtLeast(10)
             systemSettingsManager.setBrightness(next)
@@ -226,9 +258,14 @@ class CommandInterpreter(
     }
 
     private fun handleVoiceNoteCommand(lower: String): ActionResult {
-        return if (lower.contains("başlat") || lower.contains("yaz") || lower.contains("qeyd et") || lower.contains("başla")) {
+        val isStart = lower.contains("başlat") || lower.contains("yaz") || lower.contains("qeyd et") || lower.contains("başla") ||
+                lower.contains("record") || lower.contains("start") || lower.contains("запиши") || lower.contains("начать") || lower.contains("kaydet")
+        val isStop = lower.contains("dayandır") || lower.contains("saxla") || lower.contains("bitir") ||
+                lower.contains("stop") || lower.contains("save") || lower.contains("останови") || lower.contains("сохрани") || lower.contains("durdur")
+
+        return if (isStart) {
             ActionResult.VoiceNoteAction("Səsli qeyd qeydiyyatı başladılır.", startRecording = true)
-        } else if (lower.contains("dayandır") || lower.contains("saxla") || lower.contains("bitir")) {
+        } else if (isStop) {
             ActionResult.VoiceNoteAction("Səsli qeyd saxlanıldı və fayl kimi qeyd edildi.", startRecording = false)
         } else {
             ActionResult.Success("Səsli qeydlər bölməsi hazırdır.", "VOICE_NOTE_SECTION")

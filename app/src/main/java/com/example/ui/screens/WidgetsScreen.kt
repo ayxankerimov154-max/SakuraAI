@@ -32,6 +32,9 @@ fun WidgetsScreen(
     modifier: Modifier = Modifier
 ) {
     val systemState by viewModel.systemState.collectAsState()
+    val isHotwordEnabled by viewModel.isHotwordEnabled.collectAsState()
+    val malePitch by viewModel.malePitch.collectAsState()
+    val speechRate by viewModel.speechRate.collectAsState()
     val scrollState = rememberScrollState()
 
     Column(
@@ -74,6 +77,108 @@ fun WidgetsScreen(
                     contentDescription = "Yenilə",
                     tint = FridayCyan
                 )
+            }
+        }
+
+        // --- Friday AI Voice & Wake-Word Widget ---
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = FridayDarkSurfaceContainer,
+            border = androidx.compose.foundation.BorderStroke(1.dp, FridayCyan.copy(alpha = 0.4f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("friday_voice_settings_widget")
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(FridayCyan.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.RecordVoiceOver,
+                                contentDescription = null,
+                                tint = FridayCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Friday Səs & 'Hey Friday'",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = FridayTextPrimary
+                                )
+                            )
+                            Text(
+                                text = "Ton: ${String.format(java.util.Locale.US, "%.2f", malePitch)}x • Sürət: ${String.format(java.util.Locale.US, "%.2f", speechRate)}x",
+                                style = MaterialTheme.typography.labelSmall.copy(color = FridayCyan)
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { viewModel.openVoiceSettingsOverlay() },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FridayCyan.copy(alpha = 0.2f),
+                            contentColor = FridayCyan
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("open_voice_overlay_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Tənzimlə", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "'Hey Friday' Oyanma İfadəsi",
+                        style = MaterialTheme.typography.bodySmall.copy(color = FridayTextSecondary)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isHotwordEnabled) "Aktiv" else "Deaktiv",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = if (isHotwordEnabled) FridayGreen else FridayTextSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Switch(
+                            checked = isHotwordEnabled,
+                            onCheckedChange = { viewModel.toggleHotword(it) },
+                            modifier = Modifier.height(24.dp),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = FridayCyan,
+                                checkedTrackColor = FridayCyanDark.copy(alpha = 0.4f),
+                                uncheckedThumbColor = FridayTextSecondary,
+                                uncheckedTrackColor = FridayDarkSurfaceHigh
+                            )
+                        )
+                    }
+                }
             }
         }
 

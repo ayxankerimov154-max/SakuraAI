@@ -53,14 +53,15 @@ fun AssistantScreen(
 
     val samplePrompts = listOf(
         "Wi-Fi aç",
-        "Bluetooth qoş",
+        "Turn on flashlight",
+        "Включи блютуз",
         "Səsi 80% et",
-        "Parlaqlığı artır",
+        "How are you?",
+        "Как дела?",
         "Fənəri yandır",
         "Səsli qeyd yaz",
-        "Fayl yarat: qeyd1 məzmun: Test",
-        "+994501234567 zəng et",
-        "Batareya nə qədərdir?"
+        "Batareya nə qədərdir?",
+        "Saat neçədir?"
     )
 
     LaunchedEffect(chatMessages.size) {
@@ -105,8 +106,8 @@ fun AssistantScreen(
                     text = when {
                         isSpeaking -> "Friday danışır..."
                         speechState is SpeechState.Listening -> "Sizi dinləyirəm..."
-                        speechState is SpeechState.HotwordListening -> "\"Hey Friday\" gözlənilir"
-                        else -> "FRIDAY Onlayn"
+                        speechState is SpeechState.HotwordListening -> "\"Hey Friday / Fida\" gözlənilir"
+                        else -> "FRIDAY (Oğlan Səsi • Çoxdilli)"
                     },
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold,
@@ -115,34 +116,54 @@ fun AssistantScreen(
                 )
             }
 
-            // Hotword switch
+            // Hotword switch & Voice overlay trigger
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { viewModel.toggleHotword(!isHotwordEnabled) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Hey Friday",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (isHotwordEnabled) FridayCyan else FridayTextSecondary
-                    )
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Switch(
-                    checked = isHotwordEnabled,
-                    onCheckedChange = { viewModel.toggleHotword(it) },
+                IconButton(
+                    onClick = { viewModel.openVoiceSettingsOverlay() },
                     modifier = Modifier
-                        .height(24.dp)
-                        .testTag("hotword_switch"),
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = FridayCyan,
-                        checkedTrackColor = FridayCyanDark.copy(alpha = 0.4f),
-                        uncheckedThumbColor = FridayTextSecondary,
-                        uncheckedTrackColor = FridayDarkSurfaceHigh
+                        .size(32.dp)
+                        .testTag("assistant_open_voice_settings_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Voice & Wake Word Settings",
+                        tint = FridayCyan,
+                        modifier = Modifier.size(18.dp)
                     )
-                )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { viewModel.toggleHotword(!isHotwordEnabled) }
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Hey Friday",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = if (isHotwordEnabled) FridayCyan else FridayTextSecondary
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Switch(
+                        checked = isHotwordEnabled,
+                        onCheckedChange = { viewModel.toggleHotword(it) },
+                        modifier = Modifier
+                            .height(24.dp)
+                            .testTag("hotword_switch"),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = FridayCyan,
+                            checkedTrackColor = FridayCyanDark.copy(alpha = 0.4f),
+                            uncheckedThumbColor = FridayTextSecondary,
+                            uncheckedTrackColor = FridayDarkSurfaceHigh
+                        )
+                    )
+                }
             }
         }
 
@@ -253,7 +274,7 @@ fun AssistantScreen(
                     onValueChange = { textInput = it },
                     placeholder = {
                         Text(
-                            text = "Friday-ə əmr verin və ya sual soruşun...",
+                            text = "İstənilən dildə əmr verin və ya sual yazın...",
                             style = MaterialTheme.typography.bodyMedium.copy(color = FridayTextSecondary)
                         )
                     },

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.FridayViewModel
+import com.example.ui.components.VoiceSettingsOverlay
 import com.example.ui.screens.AssistantScreen
 import com.example.ui.screens.FileEditorDialog
 import com.example.ui.screens.NotesFilesScreen
@@ -62,6 +63,7 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
     val isSpeaking by viewModel.isSpeaking.collectAsState()
     val editingFile by viewModel.editingFile.collectAsState()
     val isAwakeModalOpen by viewModel.isHotwordAwakeModalOpen.collectAsState()
+    val isVoiceSettingsOverlayOpen by viewModel.isVoiceSettingsOverlayOpen.collectAsState()
 
     // Permission Launcher
     val permissionsToRequest = remember {
@@ -139,6 +141,16 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.openVoiceSettingsOverlay() },
+                        modifier = Modifier.testTag("appbar_voice_settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Voice & Wake Word Settings",
+                            tint = FridayCyan
+                        )
+                    }
                     IconButton(
                         onClick = {
                             if (isSpeaking) viewModel.stopSpeaking()
@@ -264,6 +276,14 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                 1 -> WidgetsScreen(viewModel = viewModel)
                 2 -> NotesFilesScreen(viewModel = viewModel)
                 3 -> TelephonyScreen(viewModel = viewModel)
+            }
+
+            // Voice & 'Hey Friday' Settings Overlay Menu
+            if (isVoiceSettingsOverlayOpen) {
+                VoiceSettingsOverlay(
+                    viewModel = viewModel,
+                    onDismiss = { viewModel.closeVoiceSettingsOverlay() }
+                )
             }
 
             // Built-in File Editor Modal
