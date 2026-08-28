@@ -43,7 +43,8 @@ class SystemSettingsManager(private val context: Context) {
         null
     }
 
-    private val _systemState = MutableStateFlow(fetchCurrentState())
+    private var isFlashlightActive: Boolean = false
+    private val _systemState = MutableStateFlow(SystemState())
     val systemState: StateFlow<SystemState> = _systemState.asStateFlow()
 
     private var cameraIdWithFlash: String? = null
@@ -126,7 +127,7 @@ class SystemSettingsManager(private val context: Context) {
         return SystemState(
             isWifiEnabled = isWifi,
             isBluetoothEnabled = isBt,
-            isFlashlightOn = _systemState.value.isFlashlightOn,
+            isFlashlightOn = isFlashlightActive,
             mediaVolumePercent = mediaVol,
             ringVolumePercent = ringVol,
             alarmVolumePercent = alarmVol,
@@ -195,10 +196,11 @@ class SystemSettingsManager(private val context: Context) {
 
     // --- Flashlight Control ---
     fun toggleFlashlight(enable: Boolean? = null): Boolean {
-        val target = enable ?: !_systemState.value.isFlashlightOn
+        val target = enable ?: !isFlashlightActive
         val camId = cameraIdWithFlash ?: return false
         return try {
             cameraManager?.setTorchMode(camId, target)
+            isFlashlightActive = target
             _systemState.value = _systemState.value.copy(isFlashlightOn = target)
             true
         } catch (e: CameraAccessException) {

@@ -27,9 +27,17 @@ class GeminiService {
         Əgər istifadəçi birbaşa telefon əmri verirsə, əmrin icrasını təsdiq edən qısa və xoş cavab ver.
     """.trimIndent()
 
-    suspend fun askGemini(prompt: String): String = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+    suspend fun askGemini(prompt: String, customApiKey: String? = null): String = withContext(Dispatchers.IO) {
+        val apiKey = (customApiKey?.trim()?.ifBlank { null } ?: BuildConfig.GEMINI_API_KEY.trim())
+        
+        // Only call remote Gemini endpoint if a syntactically valid Google API key is provided
+        val isValidKey = apiKey.isNotBlank() &&
+                apiKey != "MY_GEMINI_API_KEY" &&
+                apiKey != "YOUR_GEMINI_API_KEY" &&
+                apiKey.length >= 25 &&
+                (apiKey.startsWith("AIza") || apiKey.length > 30)
+
+        if (!isValidKey) {
             return@withContext getOfflineSmartResponse(prompt)
         }
 
@@ -91,16 +99,28 @@ class GeminiService {
     }
 
     private fun getOfflineSmartResponse(prompt: String): String {
-        val lower = prompt.lowercase()
+        val lower = prompt.lowercase().trim()
         return when {
-            lower.contains("salam") || lower.contains("necəsən") || lower.contains("necesen") ->
-                "Salam! Mən Friday, sizin şəxsi AI köməkçinizəm. Bütün sistem parametrlərini və qeydlərinizi idarə etməyə hazıram."
-            lower.contains("kimsin") || lower.contains("kimsən") || lower.contains("adın nədir") ->
-                "Mən Friday - telefon fəaliyyətlərinizi, səsli qeydləri, zəngləri və sistem parametrlərini idarə edən AI köməkçisiyəm."
-            lower.contains("kömək") || lower.contains("komek") || lower.contains("nə edə bilərsən") ->
-                "Mən Wi-Fi, Bluetooth, Səs, Parlaqlıq və Fənəri tənzimləyə, səsli qeydlər yazıb saxlaya, fayllar yaradıb silə, zəng edib SMS göndərə bilərəm!"
+            lower.contains("salam") || lower.contains("sabahın xeyir") || lower.contains("hər vaxtınız xeyir") ->
+                "Salam! Mən Friday, sizin xidmətinizdəyəm. Sizə necə kömək edə bilərəm?"
+            lower.contains("necəsən") || lower.contains("necesen") || lower.contains("keyfin necədir") ->
+                "Əlayəm, təşəkkür edirəm! Bütün sistemlər tam işlək vəziyyətdədir və əmrlərinizi icra etməyə hazıram."
+            lower.contains("kimsin") || lower.contains("kimsən") || lower.contains("adın nədir") || lower.contains("adin nedir") ->
+                "Mən Friday - telefon fəaliyyətlərinizi, səsli qeydləri, zəngləri və sistem parametrlərini idarə edən şəxsi AI köməkçinizəm."
+            lower.contains("kömək") || lower.contains("komek") || lower.contains("nə edə bilərsən") || lower.contains("funksiyaların") ->
+                "Mən Wi-Fi, Bluetooth, Səs, Parlaqlıq və Fənəri tənzimləyə, səsli qeydlər yazıb saxlaya, fayllar yaradıb redaktə edə, birbaşa zəng edib SMS göndərə bilərəm!"
+            lower.contains("saat") || lower.contains("vaxt") -> {
+                val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                "Hazırda saat $now-dır."
+            }
+            lower.contains("tarix") || lower.contains("bu gün") -> {
+                val today = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+                "Bu gün: $today."
+            }
+            lower.contains("təşəkkür") || lower.contains("cox sag ol") || lower.contains("çox sağ ol") || lower.contains("sağ ol") ->
+                "Xoşdur! Hər zaman xidmətinizdəyəm."
             else ->
-                "Əmrinizi başa düşdüm. Sistem fəaliyyətlərini idarə etmək üçün hazıram!"
+                "Əmrinizi başa düşdüm. Telefon parametrlərini və qeydlərinizi idarə etmək üçün hazıram!"
         }
     }
 }
