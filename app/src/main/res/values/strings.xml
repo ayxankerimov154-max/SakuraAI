@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Friday AI</string>
+    <string name="friday_title">FRIDAY AI</string>
+    <string name="friday_subtitle">Sistem İdarəetmə &amp; Səsli Köməkçi</string>
+    <string name="listening_prompt">Dinləyirəm...</string>
+    <string name="hey_friday_prompt">\"Hey Friday\" deyin və ya mikrofona toxunun</string>
+    <string name="widget_title">Telefon Ayarları</string>
+    <string name="notes_title">Səsli Qeydlər &amp; Fayllar</string>
+    <string name="comms_title">Zəng &amp; SMS İdarəsi</string>
+</resources>
