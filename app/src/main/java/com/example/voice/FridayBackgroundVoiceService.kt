@@ -144,6 +144,7 @@ class FridayBackgroundVoiceService : Service() {
                 is ActionResult.VoiceNoteAction -> result.message
                 is ActionResult.CallAction -> result.message
                 is ActionResult.SmsAction -> result.message
+                is ActionResult.LiveTalkAction -> result.message
                 is ActionResult.GeneralAnswer -> result.answer
                 null -> "Əmr icra edildi."
             }

@@ -19,6 +19,8 @@ class TextToSpeechEngine(private val context: Context) : TextToSpeech.OnInitList
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
+    private var onSpeechDoneListener: (() -> Unit)? = null
+
     // Male voice pitch & speech rate settings
     private val _malePitch = MutableStateFlow(0.82f)
     val malePitch: StateFlow<Float> = _malePitch.asStateFlow()
@@ -28,6 +30,10 @@ class TextToSpeechEngine(private val context: Context) : TextToSpeech.OnInitList
 
     init {
         tts = TextToSpeech(context.applicationContext, this)
+    }
+
+    fun setOnSpeechDoneListener(listener: (() -> Unit)?) {
+        this.onSpeechDoneListener = listener
     }
 
     override fun onInit(status: Int) {
@@ -42,15 +48,18 @@ class TextToSpeechEngine(private val context: Context) : TextToSpeech.OnInitList
 
                 override fun onDone(utteranceId: String?) {
                     _isSpeaking.value = false
+                    onSpeechDoneListener?.invoke()
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
                     _isSpeaking.value = false
+                    onSpeechDoneListener?.invoke()
                 }
 
                 override fun onError(utteranceId: String?, errorCode: Int) {
                     _isSpeaking.value = false
+                    onSpeechDoneListener?.invoke()
                 }
             })
         } else {

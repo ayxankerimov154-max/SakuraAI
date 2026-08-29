@@ -15,6 +15,7 @@ sealed class ActionResult {
     data class VoiceNoteAction(val message: String, val startRecording: Boolean) : ActionResult()
     data class CallAction(val message: String, val phoneNumber: String) : ActionResult()
     data class SmsAction(val message: String, val phoneNumber: String, val text: String) : ActionResult()
+    data class LiveTalkAction(val message: String, val startLiveTalk: Boolean) : ActionResult()
     data class GeneralAnswer(val answer: String) : ActionResult()
 }
 
@@ -58,6 +59,11 @@ class CommandInterpreter(
             // --- Brightness / Parlaqlıq Commands ---
             lower.contains("parlaqlıq") || lower.contains("parlaqliq") || lower.contains("işıqlılıq") || lower.contains("brightness") || lower.contains("яркость") || (lower.contains("ekran") || lower.contains("screen") || lower.contains("экран")) && (lower.contains("artır") || lower.contains("azalt") || lower.contains("up") || lower.contains("down") || lower.contains("ярче")) -> {
                 handleBrightnessCommand(lower)
+            }
+
+            // --- Live Talk / Canlı Danışıq Commands ---
+            lower.contains("canlı danışıq") || lower.contains("canlı söhbət") || lower.contains("canli danisiq") || lower.contains("canli sohbet") || lower.contains("live talk") || lower.contains("live chat") || lower.contains("canlı rejim") || lower.contains("живой разговор") || lower.contains("прямой разговор") || lower.contains("canlı zəng") || lower.contains("danışaq") -> {
+                ActionResult.LiveTalkAction("Canlı söhbət rejimi aktivləşdirilir. Mənimlə fasiləsiz danışa bilərsiniz.", true)
             }
 
             // --- Voice Notes Commands ---
@@ -112,6 +118,7 @@ class CommandInterpreter(
             is ActionResult.VoiceNoteAction -> result.message
             is ActionResult.CallAction -> result.message
             is ActionResult.SmsAction -> result.message
+            is ActionResult.LiveTalkAction -> result.message
             is ActionResult.GeneralAnswer -> result.answer
         }
 
@@ -123,6 +130,7 @@ class CommandInterpreter(
             is ActionResult.VoiceNoteAction -> "VOICE_NOTE"
             is ActionResult.CallAction -> "CALL"
             is ActionResult.SmsAction -> "SMS"
+            is ActionResult.LiveTalkAction -> "LIVE_TALK"
             is ActionResult.GeneralAnswer -> "AI_CHAT"
         }
 

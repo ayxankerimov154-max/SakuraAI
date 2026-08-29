@@ -37,6 +37,14 @@ data class ChatMessage(
     val actionType: String? = null
 )
 
+enum class LiveTalkPhase {
+    CONNECTING,
+    LISTENING,
+    THINKING,
+    SPEAKING,
+    MUTED
+}
+
 class FridayViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
@@ -92,10 +100,32 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
 
     val speechState: StateFlow<SpeechState> = _speechManager.speechState
     val rmsLevel: StateFlow<Float> = _speechManager.rmsLevel
+    val partialSpeechText: StateFlow<String> = _speechManager.partialTranscript
     val isHotwordEnabled: StateFlow<Boolean> = preferencesRepository.isHotwordEnabled
     val isSpeaking: StateFlow<Boolean> = ttsEngine.isSpeaking
     val malePitch: StateFlow<Float> = preferencesRepository.voicePitch
     val speechRate: StateFlow<Float> = preferencesRepository.speechRate
+
+    // --- Live Talk (Canlı Söhbət) States ---
+    private val _isLiveTalkActive = MutableStateFlow(false)
+    val isLiveTalkActive: StateFlow<Boolean> = _isLiveTalkActive.asStateFlow()
+
+    private val _liveTalkPhase = MutableStateFlow(LiveTalkPhase.CONNECTING)
+    val liveTalkPhase: StateFlow<LiveTalkPhase> = _liveTalkPhase.asStateFlow()
+
+    private val _isLiveTalkMuted = MutableStateFlow(false)
+    val isLiveTalkMuted: StateFlow<Boolean> = _isLiveTalkMuted.asStateFlow()
+
+    private val _liveTalkDurationSeconds = MutableStateFlow(0)
+    val liveTalkDurationSeconds: StateFlow<Int> = _liveTalkDurationSeconds.asStateFlow()
+
+    private val _liveTalkLatestUserPrompt = MutableStateFlow("")
+    val liveTalkLatestUserPrompt: StateFlow<String> = _liveTalkLatestUserPrompt.asStateFlow()
+
+    private val _liveTalkLatestFridayReply = MutableStateFlow("")
+    val liveTalkLatestFridayReply: StateFlow<String> = _liveTalkLatestFridayReply.asStateFlow()
+
+    private var liveTalkTimerJob: kotlinx.coroutines.Job? = null
 
     private val _isVoiceSettingsOverlayOpen = MutableStateFlow(false)
     val isVoiceSettingsOverlayOpen: StateFlow<Boolean> = _isVoiceSettingsOverlayOpen.asStateFlow()
@@ -130,6 +160,19 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         ttsEngine.setMaleVoicePitch(preferencesRepository.voicePitch.value)
         ttsEngine.setSpeechRate(preferencesRepository.speechRate.value)
         _speechManager.setHotwordEnabled(preferencesRepository.isHotwordEnabled.value)
+
+        // Setup TTS completion callback for Live Talk continuous turn taking
+        ttsEngine.setOnSpeechDoneListener {
+            if (_isLiveTalkActive.value && !_isLiveTalkMuted.value) {
+                _liveTalkPhase.value = LiveTalkPhase.LISTENING
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(200)
+                    if (_isLiveTalkActive.value && !_isLiveTalkMuted.value) {
+                        _speechManager.resumeLiveTalkListening()
+                    }
+                }
+            }
+        }
 
         // Load conversation history from Room
         viewModelScope.launch {
@@ -278,6 +321,12 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
         _isHotwordAwakeModalOpen.value = false
         if (rawText.isBlank()) return
 
+        _liveTalkLatestUserPrompt.value = rawText
+        if (_isLiveTalkActive.value) {
+            _liveTalkPhase.value = LiveTalkPhase.THINKING
+            _speechManager.pauseLiveTalkListening()
+        }
+
         appendMessage("USER", rawText)
 
         viewModelScope.launch {
@@ -292,6 +341,12 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 is ActionResult.CallAction -> result.message
                 is ActionResult.SmsAction -> result.message
+                is ActionResult.LiveTalkAction -> {
+                    if (result.startLiveTalk && !_isLiveTalkActive.value) {
+                        startLiveTalk()
+                    }
+                    result.message
+                }
                 is ActionResult.GeneralAnswer -> result.answer
             }
 
@@ -300,11 +355,79 @@ class FridayViewModel(application: Application) : AndroidViewModel(application) 
                 is ActionResult.VoiceNoteAction -> "VOICE_NOTE"
                 is ActionResult.CallAction -> "CALL"
                 is ActionResult.SmsAction -> "SMS"
+                is ActionResult.LiveTalkAction -> "LIVE_TALK"
                 is ActionResult.GeneralAnswer -> "AI"
+            }
+
+            _liveTalkLatestFridayReply.value = responseText
+            if (_isLiveTalkActive.value) {
+                _liveTalkPhase.value = LiveTalkPhase.SPEAKING
             }
 
             appendMessage("FRIDAY", responseText, actionType)
             systemSettingsManager.refreshState()
+        }
+    }
+
+    // --- Live Talk (Canlı Söhbət) Management ---
+    fun startLiveTalk() {
+        if (_isLiveTalkActive.value) return
+        _isLiveTalkActive.value = true
+        _isLiveTalkMuted.value = false
+        _liveTalkPhase.value = LiveTalkPhase.CONNECTING
+        _liveTalkDurationSeconds.value = 0
+        _liveTalkLatestUserPrompt.value = ""
+        _liveTalkLatestFridayReply.value = "Salam! Canlı söhbət rejimi aktivdir. Friday xidmətinizdədir, buyurun danışın."
+
+        // Start call duration timer
+        liveTalkTimerJob?.cancel()
+        liveTalkTimerJob = viewModelScope.launch {
+            while (_isLiveTalkActive.value) {
+                kotlinx.coroutines.delay(1000)
+                _liveTalkDurationSeconds.update { it + 1 }
+            }
+        }
+
+        val greeting = when (preferencesRepository.language.value) {
+            "EN" -> "Live talk connected. Friday is online, I am listening."
+            "RU" -> "Режим живого разговора включён. Фрайдей на связи, слушаю вас."
+            "TR" -> "Canlı konuşma modu aktif. Friday hazır, sizi dinliyorum."
+            else -> "Canlı söhbət aktivləşdirildi. Friday sizi dinləyir, buyurun."
+        }
+
+        _liveTalkPhase.value = LiveTalkPhase.SPEAKING
+        ttsEngine.speak(greeting)
+    }
+
+    fun endLiveTalk() {
+        _isLiveTalkActive.value = false
+        liveTalkTimerJob?.cancel()
+        liveTalkTimerJob = null
+        _speechManager.stopLiveTalkListening()
+        ttsEngine.stop()
+        _liveTalkPhase.value = LiveTalkPhase.CONNECTING
+        _liveTalkDurationSeconds.value = 0
+    }
+
+    fun toggleLiveTalkMute() {
+        if (!_isLiveTalkActive.value) return
+        val newMute = !_isLiveTalkMuted.value
+        _isLiveTalkMuted.value = newMute
+        _speechManager.setLiveTalkMuted(newMute)
+        if (newMute) {
+            _liveTalkPhase.value = LiveTalkPhase.MUTED
+            ttsEngine.stop()
+        } else {
+            _liveTalkPhase.value = LiveTalkPhase.LISTENING
+        }
+    }
+
+    fun interruptLiveTalkSpeaking() {
+        if (!_isLiveTalkActive.value) return
+        ttsEngine.stop()
+        _liveTalkPhase.value = LiveTalkPhase.LISTENING
+        if (!_isLiveTalkMuted.value) {
+            _speechManager.resumeLiveTalkListening()
         }
     }
 

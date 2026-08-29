@@ -36,6 +36,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.FridayViewModel
 import com.example.ui.components.ApiKeyOnboardingDialog
+import com.example.ui.components.LiveTalkOverlay
 import com.example.ui.components.VoiceSettingsOverlay
 import com.example.ui.screens.AssistantScreen
 import com.example.ui.screens.FileEditorDialog
@@ -152,6 +153,16 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.startLiveTalk() },
+                        modifier = Modifier.testTag("appbar_live_talk_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = "Start Live Talk",
+                            tint = FridayGreen
+                        )
+                    }
                     IconButton(
                         onClick = { viewModel.openVoiceSettingsOverlay() },
                         modifier = Modifier.testTag("appbar_voice_settings_button")
@@ -346,6 +357,9 @@ fun FridayApp(viewModel: FridayViewModel = viewModel()) {
                     }
                 )
             }
+
+            // Real-Time Live Talk (Canlı Danışıq) Screen Overlay
+            LiveTalkOverlay(viewModel = viewModel)
 
             // "Hey Friday" Hotword Awakening Alert
             if (isAwakeModalOpen) {

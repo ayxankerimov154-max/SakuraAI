@@ -37,11 +37,16 @@ class VoiceSpeechManager(
     private val _rmsLevel = MutableStateFlow(0f)
     val rmsLevel: StateFlow<Float> = _rmsLevel.asStateFlow()
 
+    private val _partialTranscript = MutableStateFlow("")
+    val partialTranscript: StateFlow<String> = _partialTranscript.asStateFlow()
+
     private val _isHotwordEnabled = MutableStateFlow(true)
     val isHotwordEnabled: StateFlow<Boolean> = _isHotwordEnabled.asStateFlow()
 
     private var isExplicitListening = false
     private var isContinuousListening = false
+    private var isLiveTalkMode = false
+    private var isLiveTalkMuted = false
 
     private val hotwords = listOf(
         "hey fida", "fida", "ay fida", "ey fida", "hey fiday", "fiday",
@@ -71,6 +76,7 @@ class VoiceSpeechManager(
 
     fun setHotwordEnabled(enabled: Boolean) {
         _isHotwordEnabled.value = enabled
+        if (isLiveTalkMode) return // Don't interrupt live talk
         if (enabled && _speechState.value == SpeechState.Idle) {
             startHotwordListening()
         } else if (!enabled && _speechState.value == SpeechState.HotwordListening) {
@@ -79,16 +85,67 @@ class VoiceSpeechManager(
     }
 
     fun startListeningForCommand() {
+        if (isLiveTalkMode) return
         isExplicitListening = true
         isContinuousListening = false
         startRecognizerInternal(isHotword = false)
     }
 
     fun startHotwordListening() {
+        if (isLiveTalkMode) return
         if (!_isHotwordEnabled.value) return
         isExplicitListening = false
         isContinuousListening = true
         startRecognizerInternal(isHotword = true)
+    }
+
+    fun startLiveTalkListening() {
+        isLiveTalkMode = true
+        isLiveTalkMuted = false
+        isExplicitListening = false
+        isContinuousListening = false
+        _partialTranscript.value = ""
+        startRecognizerInternal(isHotword = false)
+    }
+
+    fun pauseLiveTalkListening() {
+        if (!isLiveTalkMode) return
+        handler.post {
+            try {
+                speechRecognizer?.stopListening()
+                _speechState.value = SpeechState.Idle
+                _rmsLevel.value = 0f
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun resumeLiveTalkListening() {
+        if (!isLiveTalkMode || isLiveTalkMuted) return
+        _partialTranscript.value = ""
+        startRecognizerInternal(isHotword = false)
+    }
+
+    fun setLiveTalkMuted(muted: Boolean) {
+        isLiveTalkMuted = muted
+        if (muted) {
+            pauseLiveTalkListening()
+        } else if (isLiveTalkMode) {
+            resumeLiveTalkListening()
+        }
+    }
+
+    fun stopLiveTalkListening() {
+        isLiveTalkMode = false
+        isLiveTalkMuted = false
+        _partialTranscript.value = ""
+        stopListening()
+        if (_isHotwordEnabled.value) {
+            handler.postDelayed({
+                if (!isLiveTalkMode && _isHotwordEnabled.value) {
+                    startHotwordListening()
+                }
+            }, 800)
+        }
     }
 
     private fun startRecognizerInternal(isHotword: Boolean) {
@@ -150,7 +207,18 @@ class VoiceSpeechManager(
 
             override fun onError(error: Int) {
                 _rmsLevel.value = 0f
-                if (isContinuousListening && _isHotwordEnabled.value) {
+                if (isLiveTalkMode) {
+                    // In Live Talk, automatically retry listening after a brief breath if not muted
+                    if (!isLiveTalkMuted) {
+                        handler.postDelayed({
+                            if (isLiveTalkMode && !isLiveTalkMuted && _speechState.value != SpeechState.Listening) {
+                                startRecognizerInternal(isHotword = false)
+                            }
+                        }, 400)
+                    } else {
+                        _speechState.value = SpeechState.Idle
+                    }
+                } else if (isContinuousListening && _isHotwordEnabled.value) {
                     // Automatically restart hotword background listening after brief pause
                     handler.postDelayed({
                         if (isContinuousListening && _isHotwordEnabled.value) {
@@ -166,11 +234,15 @@ class VoiceSpeechManager(
                 _rmsLevel.value = 0f
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val recognizedText = matches?.firstOrNull() ?: ""
+                _partialTranscript.value = ""
 
                 if (recognizedText.isNotBlank()) {
                     val lower = recognizedText.lowercase().trim()
 
-                    if (isContinuousListening) {
+                    if (isLiveTalkMode) {
+                        _speechState.value = SpeechState.Recognized(recognizedText)
+                        onCommandRecognized(recognizedText)
+                    } else if (isContinuousListening) {
                         // Check if hotword is in recognized text
                         val foundHotword = hotwords.any { lower.contains(it) }
                         if (foundHotword) {
@@ -196,7 +268,13 @@ class VoiceSpeechManager(
                         onCommandRecognized(recognizedText)
                     }
                 } else {
-                    if (isContinuousListening && _isHotwordEnabled.value) {
+                    if (isLiveTalkMode && !isLiveTalkMuted) {
+                        handler.postDelayed({
+                            if (isLiveTalkMode && !isLiveTalkMuted) {
+                                startRecognizerInternal(isHotword = false)
+                            }
+                        }, 400)
+                    } else if (isContinuousListening && _isHotwordEnabled.value) {
                         handler.postDelayed({
                             if (isContinuousListening && _isHotwordEnabled.value) {
                                 startRecognizerInternal(isHotword = true)
@@ -211,11 +289,14 @@ class VoiceSpeechManager(
             override fun onPartialResults(partialResults: Bundle?) {
                 val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val partialText = matches?.firstOrNull() ?: ""
-                if (isContinuousListening && partialText.isNotBlank()) {
-                    val lower = partialText.lowercase()
-                    if (hotwords.any { lower.contains(it) }) {
-                        stopListening()
-                        onHotwordTriggered()
+                if (partialText.isNotBlank()) {
+                    _partialTranscript.value = partialText
+                    if (!isLiveTalkMode && isContinuousListening) {
+                        val lower = partialText.lowercase()
+                        if (hotwords.any { lower.contains(it) }) {
+                            stopListening()
+                            onHotwordTriggered()
+                        }
                     }
                 }
             }

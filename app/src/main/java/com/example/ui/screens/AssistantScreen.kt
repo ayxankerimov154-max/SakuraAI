@@ -188,6 +188,41 @@ fun AssistantScreen(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
         )
 
+        // Hero Live Talk Trigger Button
+        Button(
+            onClick = { viewModel.startLiveTalk() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .height(46.dp)
+                .testTag("assistant_start_live_talk_button"),
+            shape = RoundedCornerShape(23.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = FridayCyanDark.copy(alpha = 0.35f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, FridayCyan)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    tint = FridayCyan,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "🎙️ Canlı Söhbət Başlat (Live Talk)",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = FridayCyan
+                    )
+                )
+            }
+        }
+
         // Quick Suggestion Chips
         LazyRow(
             modifier = Modifier

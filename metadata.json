@@ -1,6 +1,6 @@
 {
   "name": "Friday AI",
-  "description": "Friday AI Voice Assistant with full phone control, widgets, voice notes & file manager, telephony & messaging.",
+  "description": "Friday AI Voice Assistant with Real-Time Live Talk mode, hotword background listening, full phone control, widgets, voice notes, file manager, telephony & messaging.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
